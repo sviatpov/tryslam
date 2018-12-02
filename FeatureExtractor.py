@@ -23,10 +23,9 @@ class FeatureExtractor():
 		kpts = [cv2.KeyPoint(f[0][0], f[0][1], _size=20) for f in feats]
 		kpts, des = self.orb.compute(im, kpts, None)
 
-		# compute matches
+		# compute good matches
 		pts1, pts2 = [], []
 		if self.sourse_des is not None:
-
 			matches = self.mtch.knnMatch(self.sourse_des, des, k=2)
 			# matches = sorted(matches, key=lambda x: x.distance)
 			for m, n in matches:
@@ -34,8 +33,11 @@ class FeatureExtractor():
 					# good.append(m)
 					pts2.append(kpts[m.trainIdx].pt)
 					pts1.append(self.sourse_kpts[m.queryIdx].pt)
-			F, mask = cv2.findFundamentalMat(np.asarray(pts1), np.asarray(pts2), cv2.FM_8POINT)
-			print(F)
+			pts1, pts2 = np.asarray(pts1, dtype='float32'), np.asarray(pts2, dtype='float32')
+			F, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
+			pts1 = pts1[np.where(mask[:,0]==1)]
+			pts2 = pts2[np.where(mask[:, 0] == 1)]
+			# pts2 = pts2[mask[:,0]]
 		self.sourse_des = des
 		self.sourse_kpts = kpts
 		return pts2, pts1
