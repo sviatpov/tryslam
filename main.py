@@ -2,19 +2,17 @@ import numpy as np
 import cv2
 import os
 from FeatureExtractor import FeatureExtractor
+
 dir = "/home/sviatoslavpovod/Downloads/mav0/cam0/data/"
+
 cap = cv2.VideoCapture(0)
-
 im_list = sorted(os.listdir(dir))
-
 feate = FeatureExtractor()
-
 prevIm, prevKpt = 0, 0
-i = 0
 while True:
-
 	for imname in im_list:
 		im = cv2.imread(dir + imname)
+		# _, im = cap.read(cv2.IMREAD_GRAYSCALE)
 		pts2, pts1 = feate.extract(im)
 		if len(pts1) > 0:
 			for p1, p2 in zip(pts1, pts2):

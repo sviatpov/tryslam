@@ -8,11 +8,11 @@ class FeatureExtractor():
 
 		self.sourse_des = None
 		self.sourse_kpts = None
-
+		self.F = 0
 	def extract(self, im):
 
 		# detect features
-
+		# TODO is needed use goodFeature  or just init ORB with def number of features
 		feats = cv2.goodFeaturesToTrack(np.mean(im, axis=2).astype(np.uint8), \
 										3000, \
 										qualityLevel=0.01, \
@@ -33,13 +33,23 @@ class FeatureExtractor():
 					# good.append(m)
 					pts2.append(kpts[m.trainIdx].pt)
 					pts1.append(self.sourse_kpts[m.queryIdx].pt)
+
 			pts1, pts2 = np.asarray(pts1, dtype='float32'), np.asarray(pts2, dtype='float32')
-			F, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
-			pts1 = pts1[np.where(mask[:,0]==1)]
-			pts2 = pts2[np.where(mask[:, 0] == 1)]
-			# pts2 = pts2[mask[:,0]]
+			self.F, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
+			pts1 = pts1[mask[:, 0] == 1]
+			pts2 = pts2[mask[:, 0] == 1]
+
+			# FixMe : create camera matrix befor reading image
+			K = np.asarray([[1, 0, im.shape[0] // 2], [0, 1, im.shape[1] // 2], [0, 0, 1]])
+			E = K.T @ self.F @ K
+			_,R, T, _ = cv2.recoverPose(E, pts1, pts2, K)
+			print(R)
+
+
+
 		self.sourse_des = des
 		self.sourse_kpts = kpts
+
 		return pts2, pts1
 
 class Fundamental():
