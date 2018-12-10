@@ -13,9 +13,10 @@ class FeatureExtractor():
 	def getRT(self, pts1, pts2):
 
 		E = self.K.T @ self.F @ self.K
-		_, R, T, _ = cv2.recoverPose(E, pts1, pts2, self.K)
-
-		print(R)
+		_, R, T, mask = cv2.recoverPose(E, pts1, pts2, self.K)
+		pts1 = pts1[mask[:,0] == 1]
+		pts2 = pts2[mask[:,0] == 1]
+		# print(R)
 		return R, T
 
 	def get3D(self, R, T, pts1, pts2):
@@ -62,13 +63,25 @@ class FeatureExtractor():
 		kpts, des = f2[0], f2[1]
 		source_kpts, source_des = f1[0], f1[1]
 		pts1, pts2 = [], []
+		idx1, idx2 = [], []
+		idx1s, idx2s = set(), set()
 
 		matches = self.mtch.knnMatch(source_des, des, k=2)
+
+		# FixMe check are we need this strange filter for matches
+		matches = sorted(matches, key=lambda x:x[0].distance)
 		for m, n in matches:
-			if m.distance < 0.75 * n.distance:
+			if m.distance < 0.7 * n.distance:
 				# good.append(m)
-				pts2.append(kpts[m.trainIdx].pt)
-				pts1.append(source_kpts[m.queryIdx].pt)
+				if m.distance < 32:
+					if m.queryIdx not in idx1s and m.trainIdx not in idx2s:
+						idx1.append(m.queryIdx)
+						idx2.append(m.trainIdx)
+						idx1s.add(m.queryIdx)
+						idx2s.add(m.trainIdx)
+						pts2.append(kpts[m.trainIdx].pt)
+						pts1.append(source_kpts[m.queryIdx].pt)
+
 
 		pts1, pts2 = np.asarray(pts1, dtype='float32'), np.asarray(pts2, dtype='float32')
 		self.F, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
