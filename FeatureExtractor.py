@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import g2o
+# import g2o
 
 class FeatureExtractor():
 	def __init__(self, K=0):
