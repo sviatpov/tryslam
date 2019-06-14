@@ -4,24 +4,19 @@ import os
 from multiprocessing import Process, Queue, set_start_method
 from FeatureExtractor import FeatureExtractor
 from undistort import undistort, K
+
 from Pangolin import vizualizer, draw_process
+from map import Frame, Map
 from reprojection import draw_cross
+
 import os
 dir = "/home/sviat/Documents/Datasets/kitti/2011_09_26/2011_09_26_drive_0009_sync/image_00/data/"
-# dir = "/home/sviatoslavpovod/Downloads/mav0/cam0/data/"
-
-
 
 
 def draw_lines(im, pts1, pts2):
 	for p1, p2 in zip(pts1, pts2):
 		im = cv2.line(im, (int(p1[0]), int(p1[1])), \
 					  (int(p2[0]), int(p2[1])), color=(0, 255, 0))
-
-def Rt4(R, T):
-	RT = np.concatenate((R, T), axis=1)
-	RT = np.concatenate((RT, np.array([0, 0, 0, 1]).reshape(1, 4)), axis=0)
-	return RT
 
 def remove_invisible(args):
 
@@ -50,54 +45,72 @@ if __name__ == "__main__":
 	RTprev = np.eye(4)
 	origins = []
 	cameras = []
-	D4prev = np.array([0, 0, 0]).reshape(3, 1)
+	D4prev = np.array([0, 0, 0, 0]).reshape(4, 1)
 	col_prev = np.array([0, 0, 0]).reshape(1, 3)
 	q = Queue()
 
+	mapa = Map()
 	p = Process(target=draw_process, args=(q,))
 	p.start()
 
-	while True:
-		for imname in im_list:
-			im = cv2.imread(dir + imname)
-			# im = undistort(im)
-			f2 = feate.extract(im)
-			if f1 != 0:
-				pts2, pts1 = feate.matches_frame(f1, f2)
-				R, T = feate.getRT(pts1, pts2)
-				D4 = feate.get3D(R, T, pts1.T, pts2.T).T
+	### INIT FIRST FRAME
+	im = cv2.imread(dir + im_list[0])
+	Fr = Frame(im)
+	Fr.pose = np.eye(4)
+	# im = undistort(im)
+	Fr.add_feature(feate.extract(Fr.im))
+	mapa.append_frame(Fr)
+	cameras.append(np.eye(4))
+	##### Process another frame
 
-				D4, pts1, pts2 = remove_invisible([D4, pts1, pts2])
-					# compute and save origins of each frame
-					# in first frame coordinate system
-				# origin = RTprev @ np.asarray([0, 0, 0, 1])
-				# origins.append(origin[:-1] / 10)
+	for it in range(1, len(im_list)):
+	# for imname in im_list:
+		im = cv2.imread(dir + im_list[it])
+		Fr = Frame(im)
+		# im = undistort(im)
+		Fr.add_feature(feate.extract(Fr.im))
+		mapa.append_frame(Fr)
 
-				## Draw im
-				draw_cross(im, pts2)
-				pts1_predicted = (K @ (R @ D4[:, :3].T + T)).T
-				pts1_predicted = pts1_predicted[:, :2] / pts1_predicted[:, 2:3]
-				draw_cross(im, pts1_predicted, (0, 0, 255))
+		idx1, idx2, D4, pts2 = feate.estimate_pose(*(mapa.get_two_back_frame()))
 
-				D4 = RTprev @ D4.T
-				D4 = D4[:-1] / D4[3]
+		D4 = mapa.frames[-2].pose @ D4.T
+		D4[:, :3] /= D4[: , -2, np.newaxis]
 
-				RT = Rt4(R.T, -R.T @ T)
-				RTprev = RTprev @ RT
-				D4prev = np.concatenate((D4prev, D4), axis=1)
-				cameras.append(RTprev)
+		D4prev = np.concatenate((D4prev, D4), axis=1)
+		cameras.append(mapa.frames[-2].pose)
+		color = create_color(pts2, im)
+		col_prev = np.concatenate((col_prev, color), axis=0)
+
+	# if f1 != 0:
+		# 		# compute and save origins of each frame
+		# 		# in first frame coordinate system
+		# 	# origin = RTprev @ np.asarray([0, 0, 0, 1])
+		# 	# origins.append(origin[:-1] / 10)
+		#
+		# 	## Draw im
+		# 	draw_cross(im, pts2)
+		# 	pts1_predicted = (K @ (R @ D4[:, :3].T + T)).T
+		# 	pts1_predicted = pts1_predicted[:, :2] / pts1_predicted[:, 2:3]
+		# 	draw_cross(im, pts1_predicted, (0, 0, 255))
+		#
+		# 	D4 = RTprev @ D4.T
+		# 	D4 = D4[:-1] / D4[3]
+		#
+		# 	RT = Rt4(R.T, -R.T @ T)
+		# 	RTprev = RTprev @ RT
+		# 	D4prev = np.concatenate((D4prev, D4), axis=1)
+		# 	cameras.append(RTprev)
+		#
+		#
+		# 	#### DRAW STAFFF
+		# 	color = create_color(pts2, im)
+		# 	col_prev = np.concatenate((col_prev, color), axis=0)
+		# 	# pts1_predicted = (K @ D4.T).T
+		# 	# pts1_predicted = pts1_predicted[:, :2] / pts1_predicted[:, 2:3]
 
 
-				#### DRAW STAFFF
-				color = create_color(pts2, im)
-				col_prev = np.concatenate((col_prev, color), axis=0)
-				# pts1_predicted = (K @ D4.T).T
-				# pts1_predicted = pts1_predicted[:, :2] / pts1_predicted[:, 2:3]
 
+		q.put({'points' : D4prev.T, "cameras" : cameras, "colors" : col_prev})
 
-
-				q.put({'points' : D4prev.T, 'colors' : col_prev, "cameras" : cameras})
-
-			f1 = f2
-			cv2.imshow("sdc", im)
-			cv2.waitKey(0)
+		cv2.imshow("sdc", im)
+		cv2.waitKey(0)

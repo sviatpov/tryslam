@@ -2,11 +2,33 @@ import cv2
 import numpy as np
 # import g2o
 
+
+
+
+
+
+def Rt4(R, T):
+	RT = np.concatenate((R, T), axis=1)
+	RT = np.concatenate((RT, np.array([0, 0, 0, 1]).reshape(1, 4)), axis=0)
+	return RT
+
+
+def Rt4_inv(R, T):
+	return Rt4(R.T, -R.T @ T)
+
+
+def inv_orto_Rt4(RT):
+	Rinv = RT[:3, :3].T
+	T = - Rinv @ RT[:3, 3]
+	RT[:3, :3] = Rinv
+	RT[:3, 3] = T
+
+
 class FeatureExtractor():
-	def __init__(self, K=0):
+
+	def __init__(self, K = 0):
 		self.orb = cv2.ORB_create()
 		self.mtch = cv2.BFMatcher(cv2.HAMMING_NORM_TYPE)
-
 		self.F = 0
 		self.K = K
 
@@ -14,9 +36,11 @@ class FeatureExtractor():
 
 		E = self.K.T @ self.F @ self.K
 		_, R, T, mask = cv2.recoverPose(E, pts1, pts2, self.K)
+
+		### TODO : test
+
 		pts1 = pts1[mask[:,0] == 1]
 		pts2 = pts2[mask[:,0] == 1]
-		# print(R)
 		return R, T
 
 	def get3D(self, R, T, pts1, pts2):
@@ -60,8 +84,8 @@ class FeatureExtractor():
 		@:return tuple of filtered correspondent points
 
 		"""
-		kpts, des = f2[0], f2[1]
-		source_kpts, source_des = f1[0], f1[1]
+		kpts, des = f2.key_pts, f2.des
+		source_kpts, source_des = f1.key_pts, f1.des
 		pts1, pts2 = [], []
 		idx1, idx2 = [], []
 		idx1s, idx2s = set(), set()
@@ -73,7 +97,7 @@ class FeatureExtractor():
 		for m, n in matches:
 			if m.distance < 0.7 * n.distance:
 				# good.append(m)
-				if m.distance < 32:
+				if m.distance < 10:
 					if m.queryIdx not in idx1s and m.trainIdx not in idx2s:
 						idx1.append(m.queryIdx)
 						idx2.append(m.trainIdx)
@@ -83,21 +107,46 @@ class FeatureExtractor():
 						pts1.append(source_kpts[m.queryIdx].pt)
 
 
+		## Why pts should be float ????????
 		pts1, pts2 = np.asarray(pts1, dtype='float32'), np.asarray(pts2, dtype='float32')
+		idx1, idx2 = np.asarray(idx1, dtype='uint8'), np.asarray(idx2, dtype='uint8')
 		self.F, mask = cv2.findFundamentalMat(pts1, pts2, cv2.FM_RANSAC)
+
+		idx1 = idx1[mask[:, 0] == 1]
+		idx2 = idx2[mask[:, 0] == 1]
 		pts1 = pts1[mask[:, 0] == 1]
 		pts2 = pts2[mask[:, 0] == 1]
 
-		return pts2, pts1
+		return idx1, pts1,  idx2, pts2
 
-class Fundamental():
-	def __init__(self):
-		pass
-	def get_fundamental(self, pts1, pts2):
-		F = cv2.findFundamentalMat(pts1, pts2, cv2.FM_8POINT)
-		return F
 
-class Frame():
-	def __init__(self, img):
-		self.pts, self.des = FeatureExtractor().extract(img)
-		pass
+	def filter_invisible(self, *args, mask):
+
+		ret = []
+		for e in args:
+			ret.append(e[mask])
+		return ret
+
+	def estimate_pose(self, f1, f2, save_pose = True):
+
+		## match features on two images
+
+		idx1, pts1, idx2, pts2 = self.matches_frame(f1, f2)
+
+		## estimate transformation from matched pixels
+		R, T = self.getRT(pts1, pts2)
+
+		## save pose into
+		if save_pose:
+			f2.pose = f1.pose @ Rt4_inv(R, T)
+
+		D4 = self.get3D(R, T, pts1.T, pts2.T)
+
+		## TODO check do we need it
+		D4 = D4.T
+		D4 = D4 / D4[:,-1, np.newaxis]
+		D4, idx1, idx2, pts2 = self.filter_invisible(D4, idx1, idx2,pts2, mask=D4[:, -2] > 0.05)
+
+		return idx1, idx2, D4, pts2
+
+

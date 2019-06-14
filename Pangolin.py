@@ -6,9 +6,6 @@ sys.path.append("/home/sviat/Documents/apps/pangolin_for_python/pangolin")
 import OpenGL.GL as gl
 import pangolin
 
-sys.path.append("/home/sviat/Documents/lib/g2opy/env/lib/python3.6/site-packages/")
-import g2o
-
 
 class vizualizer():
 	def __init__(self):
@@ -50,15 +47,17 @@ class vizualizer():
 			# pangolin.glDrawColouredCube(0.1)
 
 			# Draw Point Cloud
-			gl.glColor3f(1.0, 0.0, 0.0)
+			gl.glColor3f(1.0, 1.0, 0.0)
 			# pangolin.DrawPoints(points)
 			if len(pts) > 0:
-				gl.glPointSize(4)
+				gl.glPointSize(3)
 				if isinstance(colors, np.ndarray):
 					pangolin.DrawPoints(pts, colors)
+				else:
+					pangolin.DrawPoints(pts)
+
 				if isinstance(camera, list):
 					self.draw_cameras(camera)
-				pangolin.DrawPoints(pts)
 				# gl.glColor3f(0.0, 0.0, 0.0)
 				# gl.glPointSize(1)
 				# pangolin.DrawPoints(pts2)
