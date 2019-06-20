@@ -29,18 +29,15 @@ class FeatureExtractor():
 	def __init__(self, K = 0):
 		self.orb = cv2.ORB_create()
 		self.mtch = cv2.BFMatcher(cv2.HAMMING_NORM_TYPE)
-		self.F = 0
+		self.F = np.eye(3)
 		self.K = K
 
 	def getRT(self, pts1, pts2):
 
+		## TODO camera matrix remove from class field
 		E = self.K.T @ self.F @ self.K
 		_, R, T, mask = cv2.recoverPose(E, pts1, pts2, self.K)
 
-		### TODO : test
-
-		pts1 = pts1[mask[:,0] == 1]
-		pts2 = pts2[mask[:,0] == 1]
 		return R, T
 
 	def get3D(self, R, T, pts1, pts2):
@@ -97,7 +94,7 @@ class FeatureExtractor():
 		for m, n in matches:
 			if m.distance < 0.7 * n.distance:
 				# good.append(m)
-				if m.distance < 10:
+				if m.distance < 30:
 					if m.queryIdx not in idx1s and m.trainIdx not in idx2s:
 						idx1.append(m.queryIdx)
 						idx2.append(m.trainIdx)
@@ -120,7 +117,7 @@ class FeatureExtractor():
 		return idx1, pts1,  idx2, pts2
 
 
-	def filter_invisible(self, *args, mask):
+	def filter_by_mask(self, *args, mask):
 
 		ret = []
 		for e in args:
@@ -140,12 +137,15 @@ class FeatureExtractor():
 		if save_pose:
 			f2.pose = f1.pose @ Rt4_inv(R, T)
 
+
+		idx_where_true = np.where(f1.pts[idx1] == True)
+
 		D4 = self.get3D(R, T, pts1.T, pts2.T)
 
 		## TODO check do we need it
 		D4 = D4.T
 		D4 = D4 / D4[:,-1, np.newaxis]
-		D4, idx1, idx2, pts2 = self.filter_invisible(D4, idx1, idx2,pts2, mask=D4[:, -2] > 0.05)
+		D4, idx1, idx2, pts2 = self.filter_by_mask(D4, idx1, idx2,pts2, mask=D4[:, -2] > 0.05)
 
 		return idx1, idx2, D4, pts2
 

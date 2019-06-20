@@ -6,7 +6,7 @@ from FeatureExtractor import FeatureExtractor
 from undistort import undistort, K
 
 from Pangolin import vizualizer, draw_process
-from map import Frame, Map
+from map import Frame, Map, Point
 from reprojection import draw_cross
 
 import os
@@ -47,38 +47,45 @@ if __name__ == "__main__":
 	cameras = []
 	D4prev = np.array([0, 0, 0, 0]).reshape(4, 1)
 	col_prev = np.array([0, 0, 0]).reshape(1, 3)
-	q = Queue()
 
 	mapa = Map()
+
+	### Vizualization process
+	q = Queue()
 	p = Process(target=draw_process, args=(q,))
 	p.start()
 
-	### INIT FIRST FRAME
+	### INIT FIRST FRAME instead of check of first frame
 	im = cv2.imread(dir + im_list[0])
 	Fr = Frame(im)
 	Fr.pose = np.eye(4)
-	# im = undistort(im)
 	Fr.add_feature(feate.extract(Fr.im))
 	mapa.append_frame(Fr)
 	cameras.append(np.eye(4))
+
 	##### Process another frame
 
 	for it in range(1, len(im_list)):
-	# for imname in im_list:
 		im = cv2.imread(dir + im_list[it])
 		Fr = Frame(im)
-		# im = undistort(im)
+
 		Fr.add_feature(feate.extract(Fr.im))
+
 		mapa.append_frame(Fr)
 
-		idx1, idx2, D4, pts2 = feate.estimate_pose(*(mapa.get_two_back_frame()))
+		idx1, idx2, D4, pts2 = feate.estimate_pose(*(mapa.get_two_back_frame()),
+												   save_pose=True)
+
+		[mapa.append_point(Point(p)) for p in D4]
 
 		D4 = mapa.frames[-2].pose @ D4.T
-		D4[:, :3] /= D4[: , -2, np.newaxis]
 
 		D4prev = np.concatenate((D4prev, D4), axis=1)
+
 		cameras.append(mapa.frames[-2].pose)
+
 		color = create_color(pts2, im)
+
 		col_prev = np.concatenate((col_prev, color), axis=0)
 
 	# if f1 != 0:

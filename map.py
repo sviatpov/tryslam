@@ -1,5 +1,3 @@
-
-
 import sys
 sys.path.append("/home/sviat/Documents/lib/g2opy/env/lib/python3.6/site-packages/")
 import g2o
@@ -7,14 +5,21 @@ import numpy as np
 
 
 
+
 class Point():
-    def __init__(self, map, loc, col=None, tid=None):
-        self.pt = loc
-        # frames on which we can see this point
+
+    def __init__(self, coord):
+        self.pt = coord
         self.frames = []
         self.idx = []
-        self.color = col
-        # self.id = tid if tid is not None
+        self.id = None
+
+    ## TODO : how to change it on numpy array
+
+    def add_observation(self, frame, idx):
+        frame.pts[idx] = self
+        self.frames.append(frame)
+        self.idx.append(idx)
 
 
     # def add_observation(self, frame, idx):
@@ -33,7 +38,7 @@ class Frame():
     def add_feature(self, f):
         self.key_pts = f[0]
         self.des = f[1]
-        self.pts = np.zeros(shape=(len(self.key_pts), 3), dtype=np.bool)
+        self.pts = np.zeros(shape=(len(self.key_pts),), dtype=np.bool)
 
 class Map():
     def __init__(self):
@@ -41,6 +46,7 @@ class Map():
         self.points = []
         self.state = None
         self.q = None
+        self.D4 = np.array([0, 0, 0, 0]).reshape(4, 1)
 
 
     ## Optimization part
@@ -54,8 +60,13 @@ class Map():
     def get_two_back_frame(self):
         return self.frames[-2], self.frames[-1]
 
-    def append_points(self, points):
-        self.points.append(points)
+    def append_point(self, point):
+        point.id = len(self.points) + 1
+        self.points.append(point)
+
+    def add_valid_points(self, idx1, idx2, D4):
+        self.frames[-2].pts[idx1] = True
+        self.frames[-1].pts[idx2] = True
 
     def oprimizer(self):
 
