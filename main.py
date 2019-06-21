@@ -69,6 +69,7 @@ if __name__ == "__main__":
 		im = cv2.imread(dir + im_list[it])
 		Fr = Frame(im)
 
+
 		Fr.add_feature(feate.extract(Fr.im))
 
 		mapa.append_frame(Fr)
@@ -76,7 +77,8 @@ if __name__ == "__main__":
 		idx1, idx2, D4, pts2 = feate.estimate_pose(*(mapa.get_two_back_frame()),
 												   save_pose=True)
 
-		[mapa.append_point(Point(p)) for p in D4]
+## add points in map
+		[mapa.append_point(Point(p), i1, i2) for (p, i1, i2) in zip(D4, idx1, idx2)]
 
 		D4 = mapa.frames[-2].pose @ D4.T
 

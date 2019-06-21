@@ -1,6 +1,13 @@
+
+
+
+
 import sys
+
 sys.path.append("/home/sviat/Documents/lib/g2opy/env/lib/python3.6/site-packages/")
+
 import g2o
+
 import numpy as np
 
 
@@ -32,15 +39,18 @@ class Frame():
         self.key_pts = None
         self.des = None
         self.idx = None
-        self.pts = None
+        self.pts_mask = None
         self.pose = None
+        self.pts = []
 
     def add_feature(self, f):
         self.key_pts = f[0]
         self.des = f[1]
-        self.pts = np.zeros(shape=(len(self.key_pts),), dtype=np.bool)
+        self.pts_mask = np.zeros(shape=(len(self.key_pts),), dtype=np.bool)
+        self.pts = [None for i in range(len(self.key_pts))]
 
 class Map():
+
     def __init__(self):
         self.frames = []
         self.points = []
@@ -60,9 +70,13 @@ class Map():
     def get_two_back_frame(self):
         return self.frames[-2], self.frames[-1]
 
-    def append_point(self, point):
+    def append_point(self, point, idx1, idx2):
         point.id = len(self.points) + 1
+        point.add_observation(self.frames[-2], idx1)
+        point.add_observation(self.frames[-1], idx2)
         self.points.append(point)
+
+
 
     def add_valid_points(self, idx1, idx2, D4):
         self.frames[-2].pts[idx1] = True
